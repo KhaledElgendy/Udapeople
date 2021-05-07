@@ -192,6 +192,7 @@ jobs:
           command: |
             cd ./backend
             npm install
+            npm config delete proxy
 
       - run:
           name: Send migration results to memstash
