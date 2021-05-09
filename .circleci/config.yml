@@ -223,7 +223,7 @@ jobs:
             npm run migrations >> migrationStatus.txt
             
       - run:
-          name: Send migration results to memstash 
+          name: Send migration results to memstash  
           command: |
             if grep -q "has been executed successfully." ./backend/migrationStatus.txt
             then
