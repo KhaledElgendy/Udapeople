@@ -207,7 +207,6 @@ jobs:
       - run:
           name: Run migrations
           command: |
-            cd ./backend
             npm run migrations >> migrationStatus.txt
             
       - run:
