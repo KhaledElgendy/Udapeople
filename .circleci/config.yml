@@ -196,18 +196,21 @@ jobs:
   run-migrations:
     docker:
       - image: circleci/node:13.8.0
-    steps:
+    steps:  
       - checkout
+      - attach_workspace:
+          at: .  
       - run: 
           name: migration
           command: |
-            cd ./backend
             sudo apt-get update && sudo apt-get install -yy less
-            npm install
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
       - run:
           name: Run migrations
           command: |
-            cd backend
+            cd ./backend
             npm run migrations > migration_status
             
       - run:
