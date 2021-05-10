@@ -206,8 +206,9 @@ jobs:
             npm install
       - run:
           name: Run migrations
+          working_directory: ./backend
           command: |
-            npm run migrations >> migrationStatus.txt
+            npm run migrations > migration_status
             
       - run:
           name: Send migration results to memstash  
