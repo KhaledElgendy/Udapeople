@@ -211,12 +211,10 @@ jobs:
           name: Run install 
           command: |
             cd ./backend
-            sudo npm install
-            sudo npm run build
+            npm install
       - run:
           name: Run migrations 
           command: |
-            cd ./backend
             npm run migrations > migration_status
             
       - run:
