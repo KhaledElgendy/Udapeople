@@ -214,7 +214,7 @@ jobs:
             sudo npm install
             sudo npm build
       - run:
-          name: Run migrations 
+          name: Run migrations  
           command: |
             cd ./backend
             touch .env
