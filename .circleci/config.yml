@@ -215,6 +215,13 @@ jobs:
       - run:
           name: Run migrations 
           command: |
+            cd ./backend
+            export TYPEORM_HOST=udapeoplerds.cmsfgmhmbirz.us-west-1.rds.amazonaws.com
+            export TYPEORM_PASSWORD=password
+            export TYPEORM_PORT=5432
+            export TYPEORM_CONNECTION=postgres
+            export TYPEORM_DATABASE=udapeoplerds
+            export TYPEORM_USERNAME=postgres
             npm run migrations > migration_status
             
       - run:
