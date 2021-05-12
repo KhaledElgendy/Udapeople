@@ -1,295 +1,253 @@
 version: 2.1
 
+commands:
+  destroy-environment:
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.  
+    parameters:
+      # Add parameter here   
+    steps:
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+            # Your code here
+            exit 1
 
-executors:
-  node:
+  revert-migrations:
+    description: Revert the last migration if successfully run in the current workflow.
+    parameters:
+      # Add parameter here     
+    steps:
+      - run:
+          name: Revert migrations
+          # Add when this will run
+          command: |
+            # Curl command here to see if there was a successful migration associated with the workflow id, store result in SUCCESS variable
+            SUCCESS = 1
+            if(( $SUCCESS==1 )); 
+            then
+            #  cd ~/project/backend
+            #  npm install
+            #  Add revert code here. You can find this in the Getting Started section.
+              exit 1
+            fi
+            
+jobs:
+  build-frontend:
     docker:
       - image: circleci/node:13.8.0
-  python:
-    docker:
-      - image: python:3.9.0-alpine
-  aws:
-    docker:
-      - image: amazon/aws-cli
-
-
-jobs:
-
-  install-backend-dependencies:
-    executor: node
     steps:
       - checkout
+      - restore_cache:
+          keys: [frontend-build]
       - run:
-          name: npm install
-          working_directory: ./backend
-          command: ls -la && npm install
-      - persist_to_workspace:
-          root: .
-          paths:
-            - backend/node_modules
-
-
-  install-frontend-dependencies:
-   executor: node
-   steps:
-      - checkout
-      - run:
-          name: npm install
-          working_directory: ./frontend
-          command: ls -la && npm install
-      - persist_to_workspace:
-          root: .
-          paths:
-            - frontend/node_modules
-
+          name: Build front-end
+          command: |
+            cd ./frontend
+            npm i
+            npm run build
+      - save_cache:
+          paths: [frontend/node_modules]
+          key: frontend-build
 
   build-backend:
-    executor: node
+    docker:
+      - image: circleci/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [backend-build]
       - run:
-          name: npm run build
-          working_directory: ./backend
-          command: npm run build
-      - persist_to_workspace:
-          root: .
-          paths:
-            - backend/dist
-
-
-  build-frontend:
-    executor: node
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: npm run build
-          working_directory: ./frontend
-          command: npm run build
-
-
+          name: Back-end build
+          command: |
+            cd ./backend
+            npm i
+            npm run build
+      - save_cache:
+          paths: [backend/node_modules]
+          key: backend-build
+          
   test-frontend:
-    executor: node
+    docker:
+      - image: circleci/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [frontend-build]
       - run:
-          name: Install junit coverage reporter
-          working_directory: ./frontend
-          command: npm install --save-dev jest-junit
-      - run:
-          name: Run tests with JUnit as reporter
-          working_directory: ./frontend
-          command: npm test -- --ci --runInBand --reporters=default --reporters=jest-junit && pwd && ls -la /tmp
-          environment:
-            JEST_JUNIT_OUTPUT_DIR: ./test_results
-      - store_test_results:
-          path: ./frontend/test_results
-      - store_artifacts:
-          path: ./frontend/test_results
-
-
+          name: Test frontend
+          command: |
+            cd ./frontend
+            npm install
+            npm run test
+                
   test-backend:
-    executor: node
+    docker:
+      - image: circleci/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [backend-build]
       - run:
-          name: Install junit coverage reporter
-          working_directory: ./backend
-          command: npm install --save-dev jest-junit
-      - run:
-          name: Run tests with JUnit as reporter
-          working_directory: ./backend
-          command: npm test -- --ci --runInBand --reporters=default --reporters=jest-junit && pwd
-          environment:
-            JEST_JUNIT_OUTPUT_DIR: ./test_results
-      - store_test_results:
-          path: ./backend/test_results
-      - store_artifacts:
-          path: ./backend/test_results
-
-
+          name: test backend
+          command: |
+            cd ./backend
+            npm run test
   scan-frontend:
-    executor: node
+    docker:
+      - image: circleci/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [frontend-build]
       - run:
-          name: Check Frontend against security vulnerabilities
-          working_directory: ./frontend
-          command: npm audit --audit-level=critical
-
+          name: Scan frontend
+          command: |
+            cd ./frontend
+            npm audit fix --audit-level=critical --force
 
   scan-backend:
-    executor: node
+    docker:
+      - image: circleci/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [backend-build]
       - run:
-          name: Check Backend against security vulnerabilities
-          working_directory: ./backend
+          name: Scan backend
           command: |
-            npm install
-            npm audit --audit-level=critical
-
-
+            cd ./backend
+            npm audit fix --audit-level=critical --force
+            
   deploy-infrastructure:
-    executor: aws
+    docker:
+      - image: amazon/aws-cli
     steps:
       - checkout
       - run:
           name: Install dependencies
-          command: yum install -y tar gzip
+          command: |
+            yum -y install tar
+            yum -y install gzip
       - run:
-          name: Deploy backend infrastructure
-          working_directory: ./.circleci/files
+          name: Ensure back-end infrastructure exists
           command: |
             aws cloudformation deploy \
-              --template-file backend.yml \
+              --template-file .circleci/files/backend.yml \
+              --tags project=Updapeople \
               --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
-              --tags project=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  
       - run:
-          name: Save backend URL in memstash
-          command: |
-            BACKEND_IP=$(aws ec2 describe-instances \
-              --query 'Reservations[*].Instances[*].PublicIpAddress' \
-              --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --output text)
-            curl -H "Content-Type: text/plain" -H "token: 9867d3aa-0169-48e1-b71f-5a89ce0d9231" --request PUT --data "http://$BACKEND_IP:3030" https://api.memstash.io/values/BACKEND_URL
-      - run:
-          name: Deploy frontend infrastructure
-          working_directory: ./.circleci/files
+          name: Ensure front-end infrastructure exist
           command: |
             aws cloudformation deploy \
-              --template-file frontend.yml \
+              --template-file ./.circleci/files/frontend.yml \
+              --tags project=udapeople-frontend \
               --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
-              --tags project=udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+ 
       - run:
-          name: Add backend ip to ansible inventory
-          working_directory: ./.circleci/ansible
+          name: Add back-end ip to ansible inventory
           command: |
+            echo -e "[web]\n" > ./.circleci/ansible/inventory.txt
             aws ec2 describe-instances \
-              --query 'Reservations[*].Instances[*].PublicIpAddress' \
-              --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --output text >> inventory
-            cat inventory
+            --query 'Reservations[*].Instances[*].PublicIpAddress' \
+            --filters "Name=tag:project,Values=Updapeople" \
+            --output text >> ./.circleci/ansible/inventory.txt
+            cat ./.circleci/ansible/inventory.txt
       - persist_to_workspace:
-          root: .
+          root: .circleci/ansible/
           paths:
-            - .circleci/ansible/inventory
-
-
-
+            - inventory.txt
+            - IP.txt
+            
   configure-infrastructure:
-    executor: python
+    docker:
+      - image: "python:3.7-alpine3.11"
     steps:
       - checkout
       - add_ssh_keys:
           fingerprints: ["2a:61:87:b2:d8:ca:74:8e:da:02:d5:b9:98:ef:00:7a"]
       - attach_workspace:
-          at: .
+          at: .circleci/ansible/
       - run:
           name: Install dependencies
-          working_directory: ./.circleci/ansible
           command: |
             apk add --update ansible
-            ansible --version
+            apk add --update tar
+            apk add --update gzip
       - run:
           name: Configure server
-          working_directory: ./.circleci/ansible
+          no_output_timeout: 30m
           command: |
-            pwd &&
-            ls -la
-            cat inventory
-            ansible-playbook -i inventory configure-server.yml
-
-
-
+            echo ENVIROMENT=$ENVIROMENT >> "./backend/.env"
+            echo TYPEORM_CONNECTION=$TYPEORM_CONNECTION >> "./backend/.env"
+            echo TYPEORM_MIGRATIONS_DIR=$TYPEORM_MIGRATIONS_DIR >> "./backend/.env"
+            echo TYPEORM_ENTITIES=$TYPEORM_ENTITIES >> "./backend/.env"
+            echo TYPEORM_MIGRATIONS=$TYPEORM_MIGRATIONS >> "./backend/.env"
+            echo TYPEORM_HOST=$TYPEORM_HOST >> "./backend/.env"
+            echo TYPEORM_PORT=$TYPEORM_PORT >> "./backend/.env"
+            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> "./backend/.env"
+            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> "./backend/.env"
+            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> "./backend/.env"
+            ansible-playbook -i ./.circleci/ansible/inventory.txt ./.circleci/ansible/configure-server.yml
+      # Here's where you will add some code to rollback on failure   
+      
   run-migrations:
-    executor: node
-    steps:
+    docker:
+      - image: circleci/node:13.8.0
+    steps:  
       - checkout
       - attach_workspace:
-          at: .
-      - run:
-          name: Install AWS CLI dependencies
-          working_directory: /tmp
+          at: .  
+      - run: 
+          name: migration 
           command: |
             sudo apt-get update && sudo apt-get install -yy less
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip awscliv2.zip
             sudo ./aws/install
       - run:
-          name: Run migrations
-          working_directory: ./backend
+          name: Run install 
           command: |
+            cd ./backend
             npm install
-            npm run build
-            npm run migrations > migration_status
       - run:
-          name: Send migration results to memstash
-          working_directory: ./backend
+          name: Run migrations 
           command: |
-            if grep -q "has been executed successfully" migration_status
+            npm run migrations > migration_status
+            
+      - run:
+          name: Send migration results to memstash 
+          command: |
+            if grep -q "has been executed successfully." ./backend/migrationStatus.txt
             then
-              echo "DB migration was successful, will update memstash..."
-              curl -H "Content-Type: text/plain" -H "token: 2a9e15d6-b9fa-4b1f-a5dc-e3b9643a9b63" --request PUT --data "success" https://api.memstash.io/values/DB_MIGRATION_${CIRCLE_WORKFLOW_ID:0:7}
+            curl -H "Content-Type: text/plain" -H "token: ${CIRCLE_WORKFLOW_ID:0:7}" \
+            --request PUT \
+            --data "1" https://api.memstash.io/values/migration_status_${CIRCLE_WORKFLOW_ID}
             else
-              echo "DB migration failed, please verify setup! Probably the database already exists. Verify setup!"
-              curl -H "Content-Type: text/plain" -H "token: 2a9e15d6-b9fa-4b1f-a5dc-e3b9643a9b63" --request PUT --data "failure" https://api.memstash.io/values/DB_MIGRATION_${CIRCLE_WORKFLOW_ID:0:7}
+            curl -H "Content-Type: text/plain" -H "token: ${CIRCLE_WORKFLOW_ID:0:7}" \
+            --request PUT \
+            --data "0" https://api.memstash.io/values/migration_status_${CIRCLE_WORKFLOW_ID}
             fi
-            echo "WorkflowID=${CIRCLE_WORKFLOW_ID:0:7}"
-
-
+            
 workflows:
   default:
     jobs:
-      ## BUILD AND DEPLOY
-      - install-backend-dependencies
-      - install-frontend-dependencies
-
-      - build-backend:
-          requires:
-            - install-backend-dependencies
-      - build-frontend:
-          requires:
-            - install-frontend-dependencies
-      - test-backend:
-          requires:
-            - build-backend
+      - build-frontend
+      - build-backend
       - test-frontend:
-          requires:
-            -  build-frontend
+          requires: [build-frontend]
+      - test-backend:
+          requires: [build-backend]
       - scan-backend:
-          requires:
-            - build-backend
+          requires: [build-backend]
       - scan-frontend:
-          requires:
-            - build-frontend
-
-      ## INFRASTRUCTURE
+          requires: [build-frontend]
       - deploy-infrastructure:
-          filters:
-            branches:
-              only:
-                - master
+          requires: [scan-frontend]
       - configure-infrastructure:
-          requires:
-            - deploy-infrastructure
+          requires: [deploy-infrastructure]  
       - run-migrations:
-          requires:
-            - configure-infrastructure
-          filters:
-            branches:
-              only:
-                - master
+          requires: [configure-infrastructure]
+      
