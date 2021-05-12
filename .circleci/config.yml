@@ -136,7 +136,9 @@ jobs:
       - run:
           name: Check Backend against security vulnerabilities
           working_directory: ./backend
-          command: npm audit --audit-level=critical
+          command: |
+            npm install
+            npm audit --audit-level=critical
 
 
   deploy-infrastructure:
@@ -284,10 +286,6 @@ workflows:
             - deploy-infrastructure
       - run-migrations:
           requires:
-            - test-backend
-            - test-frontend
-            - scan-backend
-            - scan-frontend
             - configure-infrastructure
           filters:
             branches:
