@@ -205,7 +205,7 @@ jobs:
             sudo apt-get update && sudo apt-get install -yy less
             npm install
       - run:
-          name: Run migrations
+          name: Run migrations 
           command: |
             npm run migrations >> migrationStatus.txt
             
