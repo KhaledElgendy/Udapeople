@@ -320,7 +320,7 @@ jobs:
             echo $backendIP
             URL="http://$backendIP:3030/api/status"
             echo $URL
-            curl -s $URL
+            curl $URL
       - run:
           name: Frontend smoke test.
           command: |
