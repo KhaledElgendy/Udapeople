@@ -220,8 +220,7 @@ jobs:
             curl -H "Content-Type: text/plain" -H "token: ${CIRCLE_WORKFLOW_ID:0:7}" \
             --request PUT \
             --data "0" https://api.memstash.io/values/migration_status_${CIRCLE_WORKFLOW_ID}
-            fi
-			
+            fi		
   deploy-frontend:
     docker:
       - image: amazon/aws-cli
