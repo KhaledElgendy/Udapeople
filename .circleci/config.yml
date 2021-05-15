@@ -403,8 +403,8 @@ jobs:
           root: .circleci/ansible/
           paths:
             - originalWorkflowID.txt
-      - revert-migrations
-      - destroy-environment 
+ #     - revert-migrations
+ #     - destroy-environment 
   cleanup:
     docker:
       - image: amazon/aws-cli
