@@ -1,5 +1,5 @@
 ---
-- name: Configure udapeople infrastructure
+- name: Configure udapeople infrastructure 
   hosts: all
   user: ubuntu
   gather_facts: false
