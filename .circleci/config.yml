@@ -197,7 +197,7 @@ jobs:
     steps:
       - checkout
       - run: 
-          name: migration
+          name: migration 
           command: |
             cd ./backend
             npm install
