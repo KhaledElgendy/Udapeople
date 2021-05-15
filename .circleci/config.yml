@@ -272,6 +272,7 @@ jobs:
             apk add --update gzip
             apk add --update curl
             apk add --update openssh-client
+            apk add --update rsync
       - run:
           name: Set Enviroment variables 
           command: |
@@ -290,11 +291,11 @@ jobs:
             echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> ./.env
             cd ../
             tar -czvf /root/project/backend.tar.gz backend
+
       - run:
           name: Deploy backend
           command: |
             cd ./.circleci/ansible
-            yum install -y rsync
             ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.txt deploy-backend.yml
 #      - revert-migrations
 #      - destroy-environment 
