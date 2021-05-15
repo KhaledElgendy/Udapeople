@@ -12,7 +12,6 @@ commands:
           command: |
             # Your code here
             exit 1
-
   revert-migrations:
     description: Revert the last migration if successfully run in the current workflow.
     parameters:
@@ -105,7 +104,6 @@ jobs:
           command: |
             cd ./frontend
             npm audit fix --audit-level=critical --force
-
   scan-backend:
     docker:
       - image: circleci/node:13.8.0
@@ -134,9 +132,9 @@ jobs:
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
-              --tags project=Updapeople \
+              --tags project=udapeople-backend \
               --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  
+              --parameter-overrides ID="udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}"  
       - run:
           name: Ensure front-end infrastructure exist
           command: |
@@ -144,7 +142,7 @@ jobs:
               --template-file ./.circleci/files/frontend.yml \
               --tags project=udapeople-frontend \
               --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
+              --parameter-overrides ID="udapeople-${CIRCLE_WORKFLOW_ID:0:7}" \
  
       - run:
           name: Add back-end ip to ansible inventory
@@ -152,7 +150,7 @@ jobs:
             echo -e "[web]\n" > ./.circleci/ansible/inventory.txt
             aws ec2 describe-instances \
             --query 'Reservations[*].Instances[*].PublicIpAddress' \
-            --filters "Name=tag:project,Values=Updapeople" \
+            --filters "Name=tag:project,Values=udapeople-backend" \
             --output text >> ./.circleci/ansible/inventory.txt
             cat ./.circleci/ansible/inventory.txt
       - persist_to_workspace:
@@ -223,6 +221,80 @@ jobs:
             --request PUT \
             --data "0" https://api.memstash.io/values/migration_status_${CIRCLE_WORKFLOW_ID}
             fi
+			
+  deploy-frontend:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            yum -y install tar 
+            yum -y install gzip
+            curl -sL https://rpm.nodesource.com/setup_lts.x | bash -
+            yum -y install nodejs
+            
+      - attach_workspace:
+          at: .circleci/ansible/
+      - run:
+          name: Get backend url
+          command: |
+            backendIP=`cat ./.circleci/ansible/IP.txt`
+            export API_URL="http://${backendIP}:3030"
+            cd ./frontend
+            touch ./.env
+            echo API_URL=$API_URL >> ./.env
+            echo $API_URL
+      - run:
+          name: Deploy frontend objects
+          command: |
+            npm install webpack-dev-server -g
+            cd ./frontend
+            npm install
+            npm run build
+            aws s3 cp ./dist s3://udapeople-"${CIRCLE_WORKFLOW_ID:0:7}" --recursive
+
+  deploy-backend:
+    docker:
+      - image: "python:3.7-alpine3.11"
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["7c:c3:63:49:35:da:d8:c6:2c:22:5d:f9:17:59:4a:e1"]
+      - attach_workspace:
+          at: .circleci/ansible/
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update ansible
+            apk add --update tar
+            apk add --update gzip
+            apk add --update curl
+            apk add --update openssh-client
+      - run:
+          name: Set Enviroment variables 
+          command: |
+            cd ./backend 
+            touch .env
+
+            echo ENVIROMENT=$ENVIROMENT >> ./.env
+            echo TYPEORM_CONNECTION=$TYPEORM_CONNECTION >> ./.env
+            echo TYPEORM_MIGRATIONS_DIR=$TYPEORM_MIGRATIONS_DIR >> ./.env
+            echo TYPEORM_ENTITIES=$TYPEORM_ENTITIES >> ./.env
+            echo TYPEORM_MIGRATIONS=$TYPEORM_MIGRATIONS >> ./.env
+            echo TYPEORM_HOST=$TYPEORM_HOST >> ./.env
+            echo TYPEORM_PORT=$TYPEORM_PORT >> ./.env
+            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> ./.env
+            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> ./.env
+            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> ./.env
+            cd ../
+            tar -czvf /root/project/backend.tar.gz backend
+      - run:
+          name: Deploy backend
+          command: |
+            cd ./.circleci/ansible
+            ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.txt deploy-backend.yml
             
 workflows:
   default:
@@ -243,3 +315,7 @@ workflows:
           requires: [deploy-infrastructure]  
       - run-migrations:
           requires: [configure-infrastructure]
+      - deploy-frontend:
+          requires: [run-migrations]
+      - deploy-backend:
+          requires: [run-migrations]
