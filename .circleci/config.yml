@@ -300,6 +300,37 @@ jobs:
 #      - revert-migrations
 #      - destroy-environment 
 
+  smoke-test:
+    docker:
+      - image: "python:3.7-alpine3.11"
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .circleci/ansible/
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update tar
+            apk add --update gzip
+            apk add --update curl
+      - run:
+          name: Get Backend IP and Backend smoke test.
+          command: |
+            backendIP=`cat ./.circleci/ansible/IP.txt`
+            echo $backendIP
+            URL="http://$backendIP:3030/api/status"
+            echo $URL
+            curl -s $URL
+      - run:
+          name: Frontend smoke test.
+          command: |
+            URL="http://udapeople-${CIRCLE_WORKFLOW_ID}.s3-website-us-west-1.amazonaws.com"
+            if curl -s ${URL} | grep "Welcome"
+            then
+              return 1
+            else
+              return 0
+            fi
 
 workflows:
   default:
