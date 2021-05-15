@@ -386,12 +386,12 @@ jobs:
 
             if [ -n "$originalWorkflowID" ]
             then
+              StackOption=create-stack
+              StackName=udapeople-${CIRCLE_WORKFLOW_ID:0:7}
+            else
               echo $originalWorkflowID
               StackOption=update-stack
               StackName=udapeople-$originalWorkflowID
-            else
-              StackOption=create-stack
-              StackName=udapeople-${CIRCLE_WORKFLOW_ID:0:7}
             fi
 
             aws cloudformation $StackOption \
