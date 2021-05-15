@@ -1,51 +1,58 @@
 version: 2.1
 
 commands:
-  destroy_environment:
-    description: Destroy Cloud Formation Stacks and infrastructure
-    parameters:
-      when:
-        type: string
-      id:
-        type: string
+  destroy-environment:
+    description: Destroy frontend and backendcloudformation stacks as well as delete s3 bucket files
     steps:
       - run:
-          name: Destroy udapeople backend cfn stack
+          name: Install AWS CLI
+          when: on_fail
           command: |
-            aws cloudformation delete-stack --stack-name udapeople-backend-<< parameters.id >>
-          environment:
-            TERM: xterm-256color
-          when: << parameters.when >>
+            if ! [ -x "$(command -v aws)" ]; then
+            pip install awscli
+            else
+            echo "AWS CLI already installed"
+            fi
       - run:
-          name: Destroy udapeople frontend cfn stack and S3 bucket
+          name: Remove S3 files
+          when: on_fail
           command: |
-            aws s3 rm s3://udapeople-<< parameters.id >> --recursive
-            aws cloudformation delete-stack --stack-name udapeople-frontend-<< parameters.id >>
-          environment:
-              TERM: xterm-256color
-          when: << parameters.when >>
+            aws s3 rm s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} \
+            --recursive
+      - run:
+          name: Delete S3 bucket
+          when: on_fail
+          command: |
+            aws s3 rb s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} \
+            --force
+      - run:
+          name: Delete frontend stack
+          when: on_fail
+          command: |
+            aws cloudformation delete-stack \
+            --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+      - run:
+          name: Delete backend stack
+          when: on_fail
+          command: |
+            aws cloudformation delete-stack \
+            --stack-name udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
 
-  revert_migrations:
-    description: Revert the last migration if successfully run in the current workflow.
-    parameters:
-      when:
-        type: string
-      id:
-        type: string
+  revert-migrations:
+    description: Revert the last migration if successfully run in the current workflow. 
     steps:
       - run:
-          name: Revert migrations
-          working_directory: ./backend
+          name: Revert database migrations
           command: |
-            SUCCESS=$(curl -H "token: 2a9e15d6-b9fa-4b1f-a5dc-e3b9643a9b63" --request GET https://api.memstash.io/values/DB_MIGRATION_<< parameters.id >>)
-            echo $SUCCESS
-            if [[ "$SUCCESS" == "success" ]]
+            migrationSuccess=$(curl -H "token: ${CIRCLE_WORKFLOW_ID:0:7}" \
+            --request GET https://api.memstash.io/values/migration_status_${CIRCLE_WORKFLOW_ID})          
+            if [[ $migrationSuccess==1 ]]
             then
-              pwd
-              ls -la
+              cd /home/circleci/project/backend
+              npm install
               npm run migrations:revert
             fi
-          when: << parameters.when >>
+          when: on_fail
             
 jobs:
   build-frontend:
@@ -347,12 +354,9 @@ jobs:
             else
               return 1
             fi
-      - destroy_environment:
-          id: ${CIRCLE_WORKFLOW_ID:0:7}
-          when: on_fail
-      - revert_migrations:
-          id: ${CIRCLE_WORKFLOW_ID:0:7}
-          when: on_fail
+      - revert-migrations
+      - destroy-environment
+      
 workflows:
   default:
     jobs:
