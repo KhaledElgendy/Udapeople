@@ -277,7 +277,7 @@ jobs:
           command: |
             cd ./backend 
             touch .env
-
+            
             echo ENVIROMENT=$ENVIROMENT >> ./.env
             echo TYPEORM_CONNECTION=$TYPEORM_CONNECTION >> ./.env
             echo TYPEORM_MIGRATIONS_DIR=$TYPEORM_MIGRATIONS_DIR >> ./.env
@@ -294,6 +294,7 @@ jobs:
           name: Deploy backend
           command: |
             cd ./.circleci/ansible
+            yum install -y rsync
             ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.txt deploy-backend.yml
 #      - revert-migrations
 #      - destroy-environment 
