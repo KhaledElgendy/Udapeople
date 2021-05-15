@@ -8,11 +8,6 @@
       - ansible_host_key_checking: false
       - ansible_stdout_callback: yaml
       
-  - name: install the latest version of rsync
-    yum:
-      name: rsync
-      state: latest    
-      
     roles:
       - deploy
     environment:
