@@ -366,12 +366,13 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            yum install -y tar gzip curl
+            yum -y install tar 
+            yum -y install gzip
             curl -sL https://rpm.nodesource.com/setup_10.x | bash -
             yum install -y nodejs
+
       - run:
-          name: Store old WorkflowID in memstash for cleanup phase
-          working_directory: ./.circleci/files
+          name: Store OriginalWorkFlowID
           command: |
             aws cloudformation list-exports \
             --query "Exports[?Name=='WorkflowID'].Value" \
@@ -392,32 +393,32 @@ jobs:
               --tags Key=Name,Value=Udapeople-production-${CIRCLE_WORKFLOW_ID:0:7} 
  #     - revert-migrations
  #     - destroy-environment 
-  cleanup:
-    docker:
-      - image: amazon/aws-cli
-    steps:
-      - checkout
-      - run:
-          name: Install dependencies
-          command: |
-            yum -y install tar 
-            yum -y install gzip
-      - attach_workspace:
-          at: .circleci/ansible/
-      - run:
-          name: Get Old Stack Workflow ID and Remove old stacks and files
-          command: |
-            originalWorkflowID=`cat ./.circleci/ansible/originalWorkflowID.txt`
-            echo $originalWorkflowID
-            if [ -n "$originalWorkflowID" ]
-            then
-              aws s3 rm s3://udapeople-$originalWorkflowID --recursive
-              aws s3 rb s3://udapeople-$originalWorkflowID --force
-              aws cloudformation delete-stack --stack-name udapeople-frontend-$originalWorkflowID
-              aws cloudformation delete-stack --stack-name udapeople-backend-$originalWorkflowID
-            else
-              echo "No old workflow exists"
-            fi 
+#  cleanup:
+#    docker:
+#      - image: amazon/aws-cli
+#    steps:
+#      - checkout
+#      - run:
+#          name: Install dependencies
+#          command: |
+#            yum -y install tar 
+#            yum -y install gzip
+#      - attach_workspace:
+#          at: .circleci/ansible/
+#      - run:
+#          name: Get Old Stack Workflow ID and Remove old stacks and files
+#          command: |
+#            originalWorkflowID=`cat ./.circleci/ansible/originalWorkflowID.txt`
+#            echo $originalWorkflowID
+#            if [ -n "$originalWorkflowID" ]
+#            then
+#              aws s3 rm s3://udapeople-$originalWorkflowID --recursive
+#              aws s3 rb s3://udapeople-$originalWorkflowID --force
+#              aws cloudformation delete-stack --stack-name udapeople-frontend-$originalWorkflowID
+#              aws cloudformation delete-stack --stack-name udapeople-backend-$originalWorkflowID
+#            else
+#              echo "No old workflow exists"
+#            fi 
 workflows:
   default:
     jobs:
