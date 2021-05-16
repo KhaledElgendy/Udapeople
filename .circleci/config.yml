@@ -391,7 +391,7 @@ jobs:
               --stack-name udapeople-cloudfront-production \
               --template-file cloudfront.yml \
               --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
-              --tags Key=Name,Value=UdapeopleProduction 
+              --tags Key=Name,Value=Udapeople-production-${CIRCLE_WORKFLOW_ID:0:7}
 #     - revert-migrations
 #     - destroy-environment 
 #  cleanup:
